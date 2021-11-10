@@ -65,6 +65,7 @@ public class ElasticSearchConfiguration  {
         Integer connectionRequestTimeoutMillis = elasticsearchProperties.getConnectionRequestTimeoutMillis();
         Integer socketTimeoutMillis = elasticsearchProperties.getSocketTimeoutMillis();
         Integer connectTimeoutMillis = elasticsearchProperties.getConnectTimeoutMillis();
+        logger.info("esip地址"+host);
         try {
             if(StringUtils.isEmpty(host)){
                 host = Constant.DEFAULT_ES_HOST;

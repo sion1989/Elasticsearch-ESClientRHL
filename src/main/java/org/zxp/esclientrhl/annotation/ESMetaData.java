@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * program: esdemo
- * description: es索引元数据的注解，在es entity class上添加
+ * description: es索引元数据的注解，在es cetc28.dept4.entity class上添加
  * author: X-Pacific zhang
  * create: 2019-01-18 16:12
  **/

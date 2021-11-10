@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component;
  **/
 @Component
 public class ElasticsearchProperties {
-    @Value("${elasticsearch.host:127.0.0.1:9200}")
+    //@Value("${elasticsearch.host:127.0.0.1:9200}")
+    //@Value("${elasticsearch.host:192.168.1.139:9200}")
+    @Value("${elasticsearch.host}")
     private String host;
     @Value("${elasticsearch.username:}")
     private String username;

@@ -8,7 +8,7 @@ import java.lang.annotation.*;
 
 /**
  * program: esdemo
- * description: 对应索引结构mapping的注解，在es entity field上添加
+ * description: 对应索引结构mapping的注解，在es cetc28.dept4.entity field上添加
  * author: X-Pacific zhang
  * create: 2019-01-25 16:57
  **/
@@ -37,13 +37,15 @@ public @interface ESMapping {
      */
     boolean suggest() default false;
     /**
+     * gl修改默认为ik_smart
      * 索引分词器设置（研究类型）
      */
-    Analyzer analyzer() default Analyzer.standard;
+    Analyzer analyzer() default Analyzer.ik_max_word;
     /**
+     * gl修改默认为ik_smart
      * 搜索内容分词器设置
      */
-    Analyzer search_analyzer() default Analyzer.standard;
+    Analyzer search_analyzer() default Analyzer.ik_smart;
     //6+版本已经改变方式
 //    /**
 //     * 是否分析字段
@@ -79,4 +81,11 @@ public @interface ESMapping {
      * @return
      */
     Class nested_class() default Object.class;
+
+    /**
+     * gl
+     * 日期格式
+     * @return
+     */
+    String date_format() default "";
 }

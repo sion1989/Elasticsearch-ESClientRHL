@@ -174,7 +174,7 @@ public class UriResponse {
             private String _index;
             private String _type;
             private String _id;
-            private double _score;
+            private float _score;
             private Object _source;
 
             public String get_index() {
@@ -201,11 +201,11 @@ public class UriResponse {
                 this._id = _id;
             }
 
-            public double get_score() {
+            public float get_score() {
                 return _score;
             }
 
-            public void set_score(double _score) {
+            public void set_score(float _score) {
                 this._score = _score;
             }
 
