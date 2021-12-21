@@ -1,6 +1,7 @@
 package org.zxp.esclientrhl.util;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.zxp.esclientrhl.annotation.ESID;
@@ -23,7 +24,8 @@ import java.util.Date;
 public class IndexTools {
     @Autowired
     private ElasticsearchProperties elasticsearchProperties;
-
+    @Autowired
+    private Environment env;
     ///**
     // * 获取索引元数据：indexname、indextype
     // * @param clazz
@@ -81,6 +83,11 @@ public class IndexTools {
             indexname = clazz.getAnnotation(ESMetaData.class).indexName();
             indextype = clazz.getAnnotation(ESMetaData.class).indexType();
             //es7 https://www.elastic.co/guide/en/elasticsearch/reference/7.9/removal-of-types.html
+            //从配置文件中读取索引名
+            if (indexname.startsWith("${") && indexname.endsWith("}")) {
+                indexname = env.getProperty(indexname.substring(2,indexname.length()-1));
+            }
+
             if(indextype == null || indextype.equals("")){indextype =  "_doc";}
             number_of_shards = clazz.getAnnotation(ESMetaData.class).number_of_shards();
             number_of_replicas = clazz.getAnnotation(ESMetaData.class).number_of_replicas();
@@ -133,6 +140,8 @@ public class IndexTools {
         if(field.getAnnotation(ESMapping.class) != null){
             ESMapping esMapping = field.getAnnotation(ESMapping.class);
             mappingData.setDatatype(getType(esMapping.datatype()));
+            //gl
+            mappingData.setDate_format(esMapping.date_format().toString());
             mappingData.setAnalyzer(esMapping.analyzer().toString());
             mappingData.setNgram(esMapping.ngram());
             mappingData.setIgnore_above(esMapping.ignore_above());
@@ -184,6 +193,7 @@ public class IndexTools {
                 }
                 else if(field.getType() == Date.class){
                     mappingData.setDatatype(getType(DataType.date_type));
+
                 }
                 else{
                     mappingData.setDatatype(getType(DataType.text_type));

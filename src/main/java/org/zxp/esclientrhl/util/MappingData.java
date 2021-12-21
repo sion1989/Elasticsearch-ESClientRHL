@@ -1,11 +1,14 @@
 package org.zxp.esclientrhl.util;
 
+import lombok.Data;
+
 /**
  * program: esdemo
  * description: mapping注解对应的数据载体类
  * author: X-Pacific zhang
  * create: 2019-01-29 15:09
  **/
+@Data
 public class MappingData {
 
     String field_name;
@@ -45,6 +48,10 @@ public class MappingData {
      * @return
      */
     String search_analyzer;
+    /**
+     * 时间格式 gl
+     */
+    String date_format;
 //    /**
 //     * 是否分析字段
 //     * @return

@@ -1,7 +1,5 @@
 package org.zxp.esclientrhl.repository;
 
-import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,7 +13,6 @@ public class HighLight {
     private String preTag = "";
     private String postTag = "";
     private List<String> highLightList = null;
-    private HighlightBuilder highlightBuilder = null;
 
     public HighLight(){
         highLightList = new ArrayList<>();
@@ -44,13 +41,5 @@ public class HighLight {
 
     public void setPostTag(String postTag) {
         this.postTag = postTag;
-    }
-
-    public HighlightBuilder getHighlightBuilder() {
-        return highlightBuilder;
-    }
-
-    public void setHighlightBuilder(HighlightBuilder highlightBuilder) {
-        this.highlightBuilder = highlightBuilder;
     }
 }

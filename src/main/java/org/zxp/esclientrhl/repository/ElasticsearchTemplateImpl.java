@@ -12,10 +12,7 @@ import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.*;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
-import org.elasticsearch.client.Request;
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.Response;
-import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.*;
 import org.elasticsearch.client.core.CountRequest;
 import org.elasticsearch.client.core.CountResponse;
 import org.elasticsearch.common.unit.TimeValue;
@@ -64,6 +61,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.zxp.esclientrhl.annotation.ESID;
 import org.zxp.esclientrhl.annotation.ESMapping;
+import org.zxp.esclientrhl.annotation.SCORE;
 import org.zxp.esclientrhl.config.ElasticsearchProperties;
 import org.zxp.esclientrhl.enums.AggsType;
 import org.zxp.esclientrhl.enums.DataType;
@@ -387,6 +385,7 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
             T t = JsonUtils.string2Obj(hit.getSourceAsString(), clazz);
             //将_id字段重新赋值给@ESID注解的字段
             correctID(clazz, t, (M)hit.getId());
+            correctScore(clazz, t, hit.getScore());
             list.add(t);
         }
         return list;
@@ -431,8 +430,14 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
             Object obj = BeanTools.mapToObject((Map) uriResponse.getHits().getHits().get(i).get_source(),clazz);
             //将Object属性拷贝
             BeanUtils.copyProperties(obj, t);
+
+//            JSONObject(uriResponse.getHits().getHits().get(i).get_source(),clazz);
+
+
+
             //将_id字段重新赋值给@ESID注解的字段
             correctID(clazz, t, (M)uriResponse.getHits().getHits().get(i).get_id());
+            correctScore(clazz, t, uriResponse.getHits().getHits().get(i).get_score());
             ts[i] = t;
         }
         return Arrays.asList(ts);
@@ -738,22 +743,8 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
     private static final String keyword = ".keyword";
 
     /**
-     * 组织字段是否带有.keyword（对于当前es版本默认不打开field_data）
-     *  1、如果入参字段名称带有.keyword不处理
-     *  2、如果是非分词类型的字段（非text）不处理
-     *  3、如果是分词类型的字段（text类型）且配置了ESMapping且包含kerword子字段或者没有配置ESMapping，则拼接keyword子字段
-     *  4、如果是分词类型的字段（text类型）且配置了ESMapping且不包含kerword子字段，会自动报错
-     *  doc values
-     *      建立索引时会默认建立正排索引和倒排索引两种
-     *      就是正排索引 排序，聚合，过滤使用
-     *      doc values是被保存在磁盘上的，此时如果内存足够，os会自动将其缓存在内存中，性能还是会很高；如果内存不足够，os会将其写入磁盘上
-     *      分词field，是没有doc values的（强行打开会报错）
-     * field_data
-     *      如果想对分词字段进行排序，聚合，需要将对应字段的field_data打开（词频统计）
-     *      Fielddata和doc values结构是类似的
-     *      默认是关闭的
-     *      保存于heap内存中
-     * 如果想统计词频，需要手工设定索引并打开field_data，将ESMapping中的keyword关闭
+     * 组织字段是否带有.keyword
+     *
      * @param field
      * @param name
      * @return
@@ -935,6 +926,26 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
         }
         searchSourceBuilder.size(0);
         searchSourceBuilder.aggregation(aggregationBuilder);
+        SearchRequest searchRequest = new SearchRequest(indexname);
+        searchRequest.source(searchSourceBuilder);
+        if (metaData.isPrintLog()) {
+            logger.info(searchSourceBuilder.toString());
+        }
+        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        return searchResponse.getAggregations();
+    }
+    @Override
+    public Aggregations aggs(List<AggregationBuilder> aggregationBuilders, QueryBuilder queryBuilder, Class<T> clazz, String... indexs) throws Exception {
+        MetaData metaData = elasticsearchIndex.getMetaData(clazz);
+        String[] indexname = indexs;
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        if (queryBuilder != null) {
+            searchSourceBuilder.query(queryBuilder);
+        }
+        searchSourceBuilder.size(0);
+        for(AggregationBuilder aggregationBuilder:aggregationBuilders){
+            searchSourceBuilder.aggregation(aggregationBuilder);
+        }
         SearchRequest searchRequest = new SearchRequest(indexname);
         searchRequest.source(searchSourceBuilder);
         if (metaData.isPrintLog()) {
@@ -1375,13 +1386,8 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
                 }
             }
             //高亮
-            //https://www.elastic.co/guide/en/elasticsearch/reference/7.12/highlighting.html
-            //https://www.elastic.co/guide/en/elasticsearch/client/java-rest/7.12/java-rest-high-search.html#java-rest-high-search-request-highlighting
             HighLight highLight = pageSortHighLight.getHighLight();
-            if(highLight != null && highLight.getHighlightBuilder() != null){
-                searchSourceBuilder.highlighter(highLight.getHighlightBuilder());
-            }
-            else if (highLight != null && highLight.getHighLightList() != null && highLight.getHighLightList().size() != 0) {
+            if (highLight != null && highLight.getHighLightList() != null && highLight.getHighLightList().size() != 0) {
                 HighlightBuilder highlightBuilder = new HighlightBuilder();
                 if (!StringUtils.isEmpty(highLight.getPreTag()) && !StringUtils.isEmpty(highLight.getPostTag())) {
                     highlightBuilder.preTags(highLight.getPreTag());
@@ -1389,7 +1395,7 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
                 }
                 for (int i = 0; i < highLight.getHighLightList().size(); i++) {
                     highLightFlag = true;
-                    // You can set fragment_size to 0 to never split any sentence.
+                    // You can set fragment_size cetc28.dept4.to 0 cetc28.dept4.to never split any sentence.
                     //不对高亮结果进行拆分
                     highlightBuilder.field(highLight.getHighLightList().get(i), 0);
                 }
@@ -1437,6 +1443,7 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
             T t = JsonUtils.string2Obj(hit.getSourceAsString(), clazz);
             //将_id字段重新赋值给@ESID注解的字段
             correctID(clazz, t, (M)hit.getId());
+            correctScore(clazz, t, hit.getScore());
             //替换高亮字段
             if (highLightFlag) {
                 Map<String, HighlightField> hmap = hit.getHighlightFields();
@@ -1465,7 +1472,7 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
     }
 
     private static Map<Class,String> classIDMap = new ConcurrentHashMap();
-
+    private static Map<Class,String> classScoreMap = new ConcurrentHashMap();
     /**
      * 将_id字段重新赋值给@ESID注解的字段
      * @param clazz
@@ -1499,6 +1506,40 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
             }
         }catch (Exception e){
             logger.error("correctID error!",e);
+        }
+    }
+
+    /**
+     * 将_score字段重新赋值给@SCORE注解的字段
+     * @param clazz
+     * @param t
+     * @param
+     */
+    private void correctScore(Class clazz, T t, float _score){
+        try{
+            if(StringUtils.isEmpty(_score)){
+                return;
+            }
+            if(classScoreMap.containsKey(clazz)){
+                Field field = clazz.getDeclaredField(classScoreMap.get(clazz));
+                field.setAccessible(true);
+                if(field.get(t) == null) {
+                    field.set(t, _score);
+                }
+                return;
+            }
+            for (int i = 0; i < clazz.getDeclaredFields().length; i++) {
+                Field field = clazz.getDeclaredFields()[i];
+                field.setAccessible(true);
+                if(field.getAnnotation(SCORE.class) != null){
+                    classScoreMap.put(clazz,field.getName());
+                    if(field.get(t) == null) {
+                        field.set(t,_score);
+                    }
+                }
+            }
+        }catch (Exception e){
+            logger.error("correctScore error!",e);
         }
     }
 
@@ -1640,6 +1681,7 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
             T t = JsonUtils.string2Obj(hit.getSourceAsString(), clazz);
             //将_id字段重新赋值给@ESID注解的字段
             correctID(clazz, t, (M)hit.getId());
+            correctScore(clazz, t, hit.getScore());
             list.add(t);
         }
         ScrollResponse<T> scrollResponse = new ScrollResponse(list,scrollId);
@@ -1659,6 +1701,7 @@ public class ElasticsearchTemplateImpl<T, M> implements ElasticsearchTemplate<T,
             T t = JsonUtils.string2Obj(hit.getSourceAsString(), clazz);
             //将_id字段重新赋值给@ESID注解的字段
             correctID(clazz, t, (M)hit.getId());
+            correctScore(clazz, t, hit.getScore());
             list.add(t);
         }
         ScrollResponse<T> scrollResponse = new ScrollResponse(list,scrollId);

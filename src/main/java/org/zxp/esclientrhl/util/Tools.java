@@ -61,7 +61,7 @@ public class Tools {
     /**
      * 通过反射,获得定义Class时声明的父类的范型参数的类型.
      *
-     * @param clazz The class to introspect
+     * @param clazz The class cetc28.dept4.to introspect
      * @return the first generic declaration, or <code>Object.class</code> if cannot be determined
      */
     public static Class getSuperClassGenricType(Class clazz) {
@@ -71,7 +71,7 @@ public class Tools {
     /**
      * 通过反射,获得定义Class时声明的父类的范型参数的类型. 如public BookManager extends GenricManager<Book>
      *
-     * @param clazz clazz The class to introspect
+     * @param clazz clazz The class cetc28.dept4.to introspect
      * @param index the Index of the generic ddeclaration,start from 0.
      */
     public static Class getSuperClassGenricType(Class clazz, int index)

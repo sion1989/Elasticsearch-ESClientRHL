@@ -4,15 +4,16 @@ import org.elasticsearch.action.admin.indices.alias.Alias;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
+import org.elasticsearch.client.indices.PutIndexTemplateRequest;
 import org.elasticsearch.client.indices.rollover.RolloverRequest;
 import org.elasticsearch.client.indices.rollover.RolloverResponse;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.zxp.esclientrhl.util.IndexTools;
-import org.zxp.esclientrhl.util.MappingData;
-import org.zxp.esclientrhl.util.MetaData;
+import org.zxp.esclientrhl.util.*;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
@@ -24,9 +25,10 @@ import org.elasticsearch.common.xcontent.XContentType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.zxp.esclientrhl.util.Tools;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -57,6 +59,8 @@ public class ElasticsearchIndexImpl<T> implements ElasticsearchIndex<T> {
                     && metaData.getRolloverMaxIndexSizeCondition() == 0) {
                 throw new RuntimeException("rolloverMaxIndexAgeCondition is zero OR rolloverMaxIndexDocsCondition is zero OR rolloverMaxIndexSizeCondition is zero");
             }
+            //创建索引模板，保证自动创建的后续索引映射相同
+            createIndexTemplateRequest(clazz);
             request = new CreateIndexRequest("<"+metaData.getIndexname()+"-{now/d}-000001>");
             Alias alias = new Alias(metaData.getIndexname());
             alias.writeIndex(true);
@@ -78,6 +82,33 @@ public class ElasticsearchIndexImpl<T> implements ElasticsearchIndex<T> {
         }
     }
 
+    //创建滚动索引模型
+    public void createIndexTemplateRequest(Class<T> clazz) throws Exception {
+        MetaData metaData = indexTools.getMetaData(clazz);
+        MappingSetting mappingSource = getMappingSource(clazz, metaData);
+        String indexName=metaData.getIndexname();
+        PutIndexTemplateRequest request = new PutIndexTemplateRequest(indexName+"template");
+        List<String> indexPatterns = new ArrayList<String>();
+        indexPatterns.add(indexName+"*");
+        request.patterns(indexPatterns);
+        request.settings(mappingSource.builder);
+        String templateMapping = mappingToTemplate(mappingSource.mappingSource);
+        request.mapping(JsonUtils.string2Obj(templateMapping,Map.class));
+        try {
+            AcknowledgedResponse acknowledgedResponse = client.indices().putTemplate(request, RequestOptions.DEFAULT);
+            //返回的CreateIndexResponse允许检索有关执行的操作的信息，如下所示：
+            boolean acknowledged = acknowledgedResponse.isAcknowledged();//指示是否所有节点都已确认请求
+            logger.info("创建索引模板["+indexName+"]结果："+acknowledged);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    private String mappingToTemplate(String mapping){
+        String trimStr = mapping.trim();
+        int start=mapping.indexOf("properties");
+        String substring = "{"+trimStr.substring(start-3, trimStr.length() - 1);
+        return substring;
+    }
     private static class MappingSetting{
         protected Settings.Builder builder;
         protected String mappingSource;
@@ -272,6 +303,10 @@ public class ElasticsearchIndexImpl<T> implements ElasticsearchIndex<T> {
         if (!mappingData.isAllow_search()) {
             source.append(" ,\"index\": false\n");
         }
+        //gl
+        if(!StringUtils.isEmpty(mappingData.getDate_format())){
+            source.append(" ,\"format\": \"" + mappingData.getDate_format() + "\"\n");
+        }
         if (mappingData.isNgram() && (mappingData.getDatatype().equals("text") || mappingData.getDatatype().equals("keyword"))) {
             source.append(" ,\"analyzer\": \"autocomplete\"\n");
             source.append(" ,\"search_analyzer\": \"standard\"\n");
@@ -280,7 +315,6 @@ public class ElasticsearchIndexImpl<T> implements ElasticsearchIndex<T> {
             source.append(" ,\"analyzer\": \"" + mappingData.getAnalyzer() + "\"\n");
             source.append(" ,\"search_analyzer\": \"" + mappingData.getSearch_analyzer() + "\"\n");
         }
-
         if (mappingData.isKeyword() && !mappingData.getDatatype().equals("keyword") && mappingData.isSuggest()) {
             source.append(" \n");
             source.append(" ,\"fields\": {\n");

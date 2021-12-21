@@ -405,11 +405,11 @@ public interface ElasticsearchTemplate<T,M> {
 
 
     /**
+     * @param fieldValue 搜索建议查询条件
+     * @param param 定制Phrace Suggester的参数
      * 搜索建议phrase Suggester
      * https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters.html
      * @param fieldName 搜索建议对应查询字段
-     * @param fieldValue 搜索建议查询条件
-     * @param param 定制Phrace Suggester的参数
      * @param clazz 索引pojo类类型
      * @param indexs 索引名称
      * @return
@@ -587,7 +587,16 @@ public interface ElasticsearchTemplate<T,M> {
      * @throws Exception
      */
     public Aggregations aggs(AggregationBuilder aggregationBuilder, QueryBuilder queryBuilder, Class<T> clazz,String... indexs) throws Exception;
-
+    /**
+     * 通用（定制）聚合基础方法，请结合 https://gitee.com/zxporz/ESClientRHL/wikis/Elasticsearch-ESClientRHL 使用
+     * @param aggregationBuilders 原生聚合Builder
+     * @param queryBuilder 查询条件
+     * @param clazz 索引pojo类类型
+     * @param indexs 索引名称
+     * @return
+     * @throws Exception
+     */
+    public Aggregations aggs(List<AggregationBuilder> aggregationBuilders, QueryBuilder queryBuilder, Class<T> clazz,String... indexs) throws Exception;
 
     /**
      * 基数查询，请结合 https://gitee.com/zxporz/ESClientRHL/wikis/Elasticsearch-ESClientRHL 使用
